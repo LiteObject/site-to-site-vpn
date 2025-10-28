@@ -63,17 +63,18 @@ flowchart LR
 ## Traffic Between Clouds
 
 **Azure → AWS**
-1. An Azure VM targets an AWS address (10.2.0.0/16); the subnet UDR or BGP-learned route sends 10.2.0.0/16 to the VPN gateway.
-2. The subnet NSG allows the flow to the AWS CIDR, so packets reach the gateway subnet without being dropped.
-3. The Azure VPN gateway encapsulates the traffic with IKEv2/IPsec and forwards it via its public IP into the primary tunnel.
-4. AWS’s virtual private gateway decrypts the packets and hands them to the VPC route table, which directs 10.2.1.0/24 toward the application subnet.
-5. The destination EC2 security group permits the Azure CIDR, so the workload processes the request.
+1. An Azure VM targets an AWS address (10.2.0.0/16); the subnet UDR or BGP-learned route forwards that prefix to the Azure VPN gateway.
+2. The subnet NSG allows outbound traffic to the AWS CIDR on the required application ports, so packets reach the gateway subnet.
+3. The Azure VPN gateway encapsulates the flow with IKEv2/IPsec and sends it out one of its public IPs through the primary tunnel.
+4. AWS’s virtual private gateway decrypts the packets and relies on the VPC’s local route to deliver them into the 10.2.1.0/24 application subnet.
+5. The destination EC2 security group allows traffic from the Azure CIDR on the same application ports, so the workload accepts the request.
 
 **AWS → Azure**
-1. An EC2 instance initiates traffic to 10.1.0.0/16; the VPC route table points that prefix at the VGW (or learns it via BGP).
-2. The VGW encrypts the packets, uses the tunnel to reach the Azure VPN gateway, and preserves session state for redundancy.
-3. The Azure VPN gateway decrypts the packets and forwards them to the application subnet because the route table recognizes the source as the partner CIDR.
-4. The Azure NSG allows traffic from 10.2.1.0/24, so the packets reach the Azure VM and the response follows the same secure path back to AWS.
+1. An EC2 instance sends traffic toward Azure (10.1.0.0/16); the VPC route table directs that prefix to the VGW or relies on BGP-learned routes.
+2. The EC2 security group allows outbound traffic to the Azure CIDR on the needed application ports, so the flow reaches the VGW.
+3. The VGW encapsulates the packets with IKEv2/IPsec, forwards them across the active tunnel, and maintains the session in case of failover.
+4. The Azure VPN gateway decrypts the packets and uses its route table (BGP-learned or static UDR) to send them toward the application subnet.
+5. The Azure NSG permits inbound traffic from the AWS CIDR on those application ports, so the Azure VM processes the request and replies over the same tunnel.
 
 ## Component Roles
 
