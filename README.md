@@ -132,7 +132,3 @@ Do multiple AWS VPCs need Azure access?
          └─ Yes → Use Transit Gateway
 ```
 
-**Recommendation**
-- For LiteObject’s current single-VPC diagram, keep the VGW. It is simpler, cheaper, and fully supported by Azure’s VPN gateway.
-- Revisit TGW only if you grow into a multi-VPC mesh, need shared services across VPCs, or require higher aggregate throughput with ECMP.
-
