@@ -76,6 +76,38 @@ flowchart LR
 4. The Azure VPN gateway decrypts the packets and uses its route table (BGP-learned or static UDR) to send them toward the application subnet.
 5. The Azure NSG permits inbound traffic from the AWS CIDR on those application ports, so the Azure VM processes the request and replies over the same tunnel.
 
+## Traffic Sequence Diagram
+
+```mermaid
+sequenceDiagram
+  autonumber
+  box rgb(0,120,212) Azure
+    participant AVM as Azure VM
+    participant ANSG as Azure NSG/Route Table
+    participant AVPN as Azure VPN Gateway
+  end
+  participant NET as Public Internet
+  box rgb(255,153,0) AWS
+    participant AWVGW as AWS VGW
+    participant AWSG as AWS Security Group
+    participant AEC2 as AWS EC2 Instance
+  end
+  AVM->>ANSG: Traffic to AWS CIDR (10.2.0.0/16)
+  Note over ANSG,AVPN: UDR or BGP forwards packets to the VPN gateway
+  ANSG->>AVPN: Forwards packet toward VPN gateway
+  AVPN->>NET: Encapsulates with IKEv2/IPsec
+  NET->>AWVGW: Carries encrypted tunnel traffic
+  AWVGW->>AWSG: Decrypts and routes inside VPC
+  AWSG->>AEC2: Delivers to EC2 workload (allowed ports)
+  AEC2-->>AWSG: Response to Azure CIDR (10.1.0.0/16)
+  AWSG-->>AWVGW: Allows outbound response traffic
+  AWVGW-->>NET: Encapsulates response with IPSec
+  NET-->>AVPN: Returns encrypted tunnel traffic
+  AVPN-->>ANSG: Decrypts and forwards to app subnet
+  ANSG-->>AVM: Azure VM receives response
+  Note over AVPN,AWVGW: Secondary tunnel provides failover if primary drops
+```
+
 ## Component Roles
 
 - **Azure VNet (10.1.0.0/16)**: Aggregates Azure subnets; provides address space for workloads and the gateway subnet.
