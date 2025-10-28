@@ -93,3 +93,46 @@ flowchart LR
 - **AWS Route Table**: Sends Azure-bound prefixes to the VGW when static; auto-propagates routes learned via BGP.
 - **AWS Security Group**: Applies stateful firewall rules on EC2 instances, permitting only the Azure CIDR and required ports.
 
+## AWS Transit Gateway Considerations
+
+**Q. In this site-to-site VPN between Azure and AWS, is AWS Transit Gateway required?**
+
+**A.** No. A basic Azure ↔ AWS VPN works with just a Virtual Private Gateway (VGW). Use the checklist below to decide when VGW alone is enough and when Transit Gateway (TGW) is worth the added cost and complexity.
+
+**When a VGW Is Sufficient**
+- Single VPC connecting to Azure or a simple hub-and-spoke design.
+- Fewer than 10 simultaneous VPN connections (VGW limit per gateway).
+- Standard redundancy needs (each connection provides two tunnels).
+- Throughput expectations within the ~1.25 Gbps-per-tunnel envelope.
+- Cost-sensitive deployments where TGW hourly and per-GB charges would be wasteful.
+
+**When Transit Gateway Becomes Valuable**
+- Multiple VPCs (or on-premises networks) must share the Azure tunnel.
+- You need transitive routing—VPC-to-VPC traffic over the same hub.
+- Centralized management of many VPNs, VPCs, or Direct Connect links.
+- Requirements for advanced routing (per-attachment route tables, ECMP, segregation by policy).
+- Aggregate VPN throughput or connection count exceeds VGW limits.
+
+**Cost Snapshot (US regions, Oct 2025)**
+- VGW: no hourly fee for the gateway itself; each Site-to-Site VPN connection is ~$0.05/hour (~$36/month) with no TGW-style per-GB processing charge (standard VPC data transfer rates still apply).
+- TGW: each VPC/VPN attachment is ~$0.05/hour (~$36/month) **plus** $0.02/GB processed, so multi-VPC designs scale in price.
+
+**Architecture at a Glance**
+```
+Simple VGW:   Azure VNet ⇄ VPN ⇄ VGW ⇄ Single VPC
+TGW Hub:      Azure VNet ⇄ VPN ⇄ TGW ⇄ VPC A / VPC B / VPC C / On‑prem
+```
+
+**Quick Decision Tree**
+```
+Do multiple AWS VPCs need Azure access?
+├─ No → Use VGW ✓
+└─ Yes → Do those VPCs need to talk to each other?
+         ├─ No → Use separate VGWs (one per VPC)
+         └─ Yes → Use Transit Gateway
+```
+
+**Recommendation**
+- For LiteObject’s current single-VPC diagram, keep the VGW. It is simpler, cheaper, and fully supported by Azure’s VPN gateway.
+- Revisit TGW only if you grow into a multi-VPC mesh, need shared services across VPCs, or require higher aggregate throughput with ECMP.
+
