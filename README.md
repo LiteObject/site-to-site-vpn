@@ -39,12 +39,16 @@ flowchart LR
   end
     AzureVM --> AppSubnet
     GWSubnet --> VNetGW
-    VNetGW --> AzurePIP1 & AzurePIP2 & LocalGW
-    AppSubnet --> AzureRT & AzureNSG
+      VNetGW --> AzurePIP1
+      VNetGW --> AzurePIP2
+      VNetGW --> LocalGW
+      AppSubnet --> AzureRT
+      AppSubnet --> AzureNSG
     AWSEC2 --> EC2Subnet
     VGW --> VPNConn
     VPNConn --> CGW
-    EC2Subnet --> AWSRT & AWSSG
+      EC2Subnet --> AWSRT
+      EC2Subnet --> AWSSG
     AWSRT --> VGW
     AzurePIP1 -.-> Internet["Internet<br>IPSec Tunnels"]
     AzurePIP2 -.-> Internet
@@ -55,3 +59,19 @@ flowchart LR
     VGW -- "4: Decrypted" --> AWSEC2
 
 ```
+
+## Traffic Between Clouds
+
+**Azure → AWS**
+1. An Azure VM targets an AWS address (10.2.0.0/16); the subnet UDR or BGP-learned route sends 10.2.0.0/16 to the VPN gateway.
+2. The subnet NSG allows the flow to the AWS CIDR, so packets reach the gateway subnet without being dropped.
+3. The Azure VPN gateway encapsulates the traffic with IKEv2/IPsec and forwards it via its public IP into the primary tunnel.
+4. AWS’s virtual private gateway decrypts the packets and hands them to the VPC route table, which directs 10.2.1.0/24 toward the application subnet.
+5. The destination EC2 security group permits the Azure CIDR, so the workload processes the request.
+
+**AWS → Azure**
+1. An EC2 instance initiates traffic to 10.1.0.0/16; the VPC route table points that prefix at the VGW (or learns it via BGP).
+2. The VGW encrypts the packets, uses the tunnel to reach the Azure VPN gateway, and preserves session state for redundancy.
+3. The Azure VPN gateway decrypts the packets and forwards them to the application subnet because the route table recognizes the source as the partner CIDR.
+4. The Azure NSG allows traffic from 10.2.1.0/24, so the packets reach the Azure VM and the response follows the same secure path back to AWS.
+
