@@ -75,3 +75,20 @@ flowchart LR
 3. The Azure VPN gateway decrypts the packets and forwards them to the application subnet because the route table recognizes the source as the partner CIDR.
 4. The Azure NSG allows traffic from 10.2.1.0/24, so the packets reach the Azure VM and the response follows the same secure path back to AWS.
 
+## Component Roles
+
+- **Azure VNet (10.1.0.0/16)**: Aggregates Azure subnets; provides address space for workloads and the gateway subnet.
+- **Azure Application Subnet (10.1.1.0/24)**: Hosts the application VMs; associates with NSGs/UDRs to control east-west routing.
+- **Azure Gateway Subnet (10.1.255.0/27)**: Mandatory subnet where the Azure VPN gateway resides; no NSG support to avoid tunnel disruption.
+- **Azure VPN Gateway**: Terminates IPSec tunnels, handles BGP or static routes, exposes redundant public IPs, and encapsulates traffic.
+- **Azure Route Table**: Supplies static UDR to reach AWS when not using BGP; left empty when dynamic routing is enabled.
+- **Azure NSG**: Enforces security policies on the application subnet, allowing only the AWS CIDR and required application ports.
+- **Public Internet**: Carries the IPSec-encrypted traffic between Azure and AWS gateways over UDP 500/4500 and ESP.
+- **AWS VPC (10.2.0.0/16)**: Provides the AWS addressing space that contains subnets for workloads and attachments.
+- **AWS Application Subnet (10.2.1.0/24)**: Hosts EC2 instances that consume/serve application traffic from/to Azure.
+- **AWS Virtual Private Gateway (VGW)**: Terminates IPSec tunnels on AWS side; injects prefixes into the VPC route tables.
+- **AWS Customer Gateway (CGW)**: Represents the Azure VPN gateway in AWS; stores IPs/BGP ASN used by the connection.
+- **AWS VPN Connection**: Logical pairing of tunnels between the VGW and CGW; each tunnel provides redundancy.
+- **AWS Route Table**: Sends Azure-bound prefixes to the VGW when static; auto-propagates routes learned via BGP.
+- **AWS Security Group**: Applies stateful firewall rules on EC2 instances, permitting only the Azure CIDR and required ports.
+
